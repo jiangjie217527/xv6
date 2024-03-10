@@ -5,7 +5,7 @@
 int main(int argc, char *argv[]){
 	if(argc != 2){
         char* msg = "usage: sleep [ticks num]\n";
-		write(1,msg,strlen(msg));
+		fprintf(2,msg,strlen(msg));
 		exit(1);
 	}
 	int ticks = atoi(argv[1]);
