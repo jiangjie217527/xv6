@@ -191,7 +191,7 @@ UPROGS=\
 	$U/_sleep\
 	$U/_pingpong\
 	$U/_try\
-
+	$U/_trace\
 
 
 
