@@ -192,7 +192,7 @@ UPROGS=\
 	$U/_pingpong\
 	$U/_try\
 	$U/_trace\
-
+	$U/_sysinfotest\
 
 
 ifeq ($(LAB),lock)
