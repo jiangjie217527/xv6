@@ -165,6 +165,10 @@ main(void)
         fprintf(2, "cannot cd %s\n", buf+3);
       continue;
     }
+    if(buf[0] == 'q'){
+        exit(2);//exit
+    }
+
     if(fork1() == 0)
       runcmd(parsecmd(buf));
     wait(0);
