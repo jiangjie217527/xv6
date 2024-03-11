@@ -1,0 +1,131 @@
+Include errors I met and techniques I found that helps me to finish the lab using pure **txt** file.
+
+(I think md file or pdf generated with latex may be more beautiful.)
+
+# environment
+
+In fact, I have dual system in my computer, one is win11 and the other is Ubuntu 22.04.4LTS, which I am using now. So I installed qemu by myself and use vim as editor instead of vscode, whose version is 5.1.0. This makes qemu and other applications run faster in my computer. (Someone only allocated one CPU core for VMware and spent 40s in trace test.)
+
+# sleep
+
+## error
+
+This is the easiest job in this lab. However, I found myself confused about the two calls below at first.
+
+~~~
+fprintf(2,msg,strlen(msg));
+write(1,msg,strlen(msg));
+~~~
+
+After I read the xv6 book and understood fd(file descriptor), I finally distinguish them. The process "sh" open fd 0 as standard input, 1 as standard output and 2 as error output, and if the user didn't use the command rightly, the message should be output to fd 2. This design makes it easy to redirect standard output and error message to different place.
+
+## techniques
+
+In this job, I think the most important technique is to read similar codes and imitate them. What's more, in user/user.h and the xv6 book, I can find all the function and what are they doing.
+
+# pingpong
+
+## error
+
+I think this is a very interesting thing, but xv6 book doesn't tell every thing and I tried a lot.
+
+I quote as in the below:
+
+~~~
+Writing data to one end of the pipe makes that data available for reading from the other end of the pipe.
+~~~
+
+However, this book didn't tell me that I can only write to one end but can't write to another end. So it is easy to make mistakes.
+
+Take a simplified code for example, I had these lines.
+
+~~~
+int p[2];
+char buf[] = {0};
+
+pipe(p);
+
+write(p[0],buf,1);
+read(p[1],buf,1);
+~~~
+
+This program never ends!!! This example indicates another principle mentioned in the book.
+
+I quote:
+
+~~~
+a read on a pipe waits for either data to be written or for all file descriptors referring to the write end to be closed; in the latter case, read will return 0.
+~~~
+
+Now let's analysis these lines: 
+
+First, I create a pipe without any problems. Then I want to write in p[0]. But in fact, if you see the return value of this operation, you will get -1 which means this operation failed. This operation fails indeed, but the program goes on.
+
+Then I want to read in p[1]. This is the fatal error and very interesting. 
+
+First, p[1] can only be written. I have no rights to read in p[1], so this read can only end with the close of the fd.
+
+Second, even if I have rights to read, I also can not write in p[0], which makes nothing can be delievered to p[1], and I can't read too. In this case, if I have a child process, the child can write at p[1]. However, this will be delieverd to p[0].(In fact, I can't read so I don't know what's in p[1].)
+
+Third, with the analysis above, we can only release the fd to make the read unblock. But the process is blocked and can not release the fd at all! What about the child process? Release the fd pointing at the same inode has nothing to do with the fd table in the father process.
+
+So one mistake will make the process blocked forever!
+
+With the example, we can also learn the importance to close some fd.
+
+## techiniques
+
+I think in this job, reading xv6 book really helps me a lot. Also, trying to use the pipe with all possibilities is also quite important.
+
+After understanding the example above, it is easy to create two pipes and communicate with each other.
+
+# trace
+
+## error
+
+This is not a error, but reading Chapter 2 didn't help a lot with this job, which tell me every about how xv6 organized and started.
+
+The hint of this job tells everything clear, so it's easy to do something to user/user.h and user/usys.pl
+
+One error is that the hint tells me to add a syscall number to kernel/syscall.h . In fact, the number already exists and I didn't find it, so I added the number again.
+
+Another error is when I output the name of syscall, I first output the name of the process by mistake. Then I output syscall_name[num]. But the index starts at 0 and the number of syscall starts at 1, so I get things wrong again.
+
+Anyway, these things are easy to deal with,
+
+## techniques
+
+I think this job is just do what the hint says, and the process is very interesting. Thinking about how to implement and imitating other function efficient are important because there are too many functions. Anyway I can find all of them and where are them in kernel/defs.h. xv6 book also shows their function.
+
+Also, using vim makes it easy to locate code file among many files, as long as I can remember its name and what it contains.
+
+# sysinfo
+
+## error
+
+This time, I add a functoin to kernel/kalloc.c and kernel/proc.c . However, I forget to add them to kernel/defs.h, which makes the code can't be compiled and bother me a lot.
+
+Then, when I complete sys_sysinfo in kernel/sysproc.c, I forgot to include "sysinfo.h" in this file because the hint don't tell me to do this. This causes compile error and also need some time to fix.Because the error message is confusing. You can see it below.
+
+I quote:
+
+~~~
+kernel/sysproc.c:121:20: error: storage size of ‘info’ isn’t known
+  121 |     struct sysinfo info;
+      |                    ^~~~
+kernel/sysproc.c:121:20: error: unused variable ‘info’
+~~~
+
+At first I thought this is a struct, and the compilor worry that the size of the struct is too big. After analysing carefully, I finally realize this problem.
+
+Anyway, this is the problem of vim, which can not help me analysis code, and it makes me seldom use my mouse. Every problem can only be shown when I finish the code and compile it. Sometimes it is just a typo! Also, I seldom use code completion because it won't jump out automatically unless I press ctrl+N.
+
+## techniques
+
+The same with trace.
+
+# other things I did
+
+I modified the code so that when I entered a single q, the shell exit with a special status number then the init get the status then the init exit.
+
+I think this makes the system shutdown, but it didn't. init is the user program, the kernal program is still alive and got panic. However, I seemly didn't find any syscall like shutdown and can only exit qemu with ctrl+a and x .
