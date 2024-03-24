@@ -60,6 +60,7 @@ sys_sleep(void)
   acquire(&tickslock);
   ticks0 = ticks;
 #ifdef LAB_TRAPS
+  backtrace();
 #endif
   while(ticks - ticks0 < n){
     if(killed(myproc())){
