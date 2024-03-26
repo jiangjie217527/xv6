@@ -128,3 +128,20 @@ sys_sysinfo(void){
     }
     return 0;
 }
+
+uint64
+sys_sigalarm(void){
+    int interval;
+    uint64 handler;
+    argint(0,&interval);
+    argaddr(1,&handler);
+    myproc()->passed_ticks=0;
+    myproc()->alarm_interval=interval;
+    myproc()->handler_function=handler;
+    return 0;
+}
+
+uint64
+sys_sigreturn(void){
+    return 0;
+}

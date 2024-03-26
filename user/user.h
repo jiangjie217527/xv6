@@ -29,6 +29,10 @@ int sleep(int);
 int uptime(void);
 int trace(int); // new trace
 int sysinfo(struct sysinfo *); // new sysinfotest
+//trap --- alarm  --begin
+int sigalarm(int ticks, void (*handler)());
+int sigreturn(void);
+//trap --- alarm --end
 #ifdef LAB_NET
 int connect(uint32, uint16, uint16);
 #endif
