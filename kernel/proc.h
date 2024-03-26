@@ -111,5 +111,9 @@ struct proc {
   int alarm_interval;
   int passed_ticks;
   uint64 handler_function;
+
+  struct trapframe *alarmframe;
+
+  int trap_in;
     //end argument of trap-alarm
 };

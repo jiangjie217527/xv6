@@ -143,5 +143,9 @@ sys_sigalarm(void){
 
 uint64
 sys_sigreturn(void){
-    return 0;
+    struct proc *p = myproc();
+    *p->trapframe = *p->alarmframe;
+    p->trap_in = 0;
+    p->passed_ticks = 0;
+    return (*p->trapframe).a0;
 }

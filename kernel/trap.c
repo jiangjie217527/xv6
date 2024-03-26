@@ -79,10 +79,12 @@ usertrap(void)
     exit(-1);
 
   // give up the CPU if this is a timer interrupt.
-    //increase the ticks passed, if 
+    //increase the ticks passed 
   if(which_dev == 2){
     ++p->passed_ticks;
-    if(p->alarm_interval!= 0 && p->passed_ticks == p->alarm_interval){
+    if(p->trap_in == 0 &&p->alarm_interval!= 0 && p->passed_ticks == p->alarm_interval){
+        p->trap_in=1;
+        *p->alarmframe = *p->trapframe;
         p->trapframe->epc = p->handler_function;    
         p->passed_ticks = 0;
     }
