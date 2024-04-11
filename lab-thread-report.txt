@@ -1,0 +1,25 @@
+# before the report
+
+Well, in this lab, I have to admit that I refer to the document of the 6.S081, which is https://pdos.csail.mit.edu/6.S081/2020/labs/thread.html. This document of this lab given by the TA is so simplified that I can hardly understand how to finish the lab. The most thing I got from the document is the content of the lab to help me make sure that I didn't do the wrong lab. Many skills of the lab was leart from the website document.
+
+# uthread
+
+This is the most different difficult part in this lab, compared with the other two. I made some mistakes and spent me a lot of time to write testing code and debug. (Somehow I can't start my gdb-multiarch correctly.) 
+
+First error I made was that when I add context to the thread structure and copy the switch asm code from kernel/swtch.S, I didn't really look into it and took it for granted that I can add the context in any part of the structure. However, when the code fails, I knows that the asm code gets the starting part of the structure and store the registers in these memort parts, So the context must be in the first part of the structure.
+
+Second error is that I forgot to change the type of stack point into void* and stored t->stack+STACK_SIZE into sp. I think that the stack is an array of char, so I add STACK_SIZE will return the correct address, but it didn't. This is really hard to find, until I happened to annotate the (ld sp 8(a1)) and find that this program can return from thread_switch. Then I know that I stored the wrong address, which I think is not allocated, to the stack point.
+
+My technique of debugging of this lab is to write some code to output some infomation such as address to get the idea. I tried to read the asm code which was compiled(uthread.asm), but this is too complicated to understand. You can find some functions and annotations related to debugging in my code.
+
+# pthread
+
+This is really easy, I have written parallel code a long time ago. However, this time I add lock to every bucket instead of the whole hashmap, so the speed of the program hardly slow down.
+
+# barrier
+
+The document didn't tell me how to use pthread_cond_wait together with mutex lock and I know from the website that I have to pass a mutex as an argument. In fact, I write a dead lock once, because I forgot that when a thread got woken up, It will acquire the lock, but I release the lock only for the last thread which called the barrier(), so other thread can't wake up and the program dead. It is easy to analysis, anyway.
+
+# ALL
+
+All in all, this lab helps me learn more about thread and asm code. Moderate hardness anyway but also spent a few hours.
