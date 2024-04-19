@@ -1,0 +1,17 @@
+# before report
+
+This lab is a little bit harder than previous lab, but this time the video tells me a lot.
+
+# Memory allocator
+
+I really likes one picture shown in the video, which vividly and directly tells me what I should do. The picture shows that the kmem was used to be one freelist and it will be used by all CPUs. But now, I should change it into many freelists, one list per CPU. After that, I also add lock on every list so that when one CPU use out of its freelist and searching free memory in other's freelist, the exact other CPU won't get involved in a race with the CPU and make things go wrong.
+
+In fact, this task is easy and I don't remember what error I met. Just follow the instructions and I got it.
+
+# Buffer cache
+
+This task does a lot of changes to the origin structure and is harder to understand. Originally, this section use LRU algorithm to get a relatively good performance, but now, we don't need this, so many things can be deleted, for example the head. The buffer was used to implemented as a list, so the field of buf has "next" and "prev". But now we can detect the next with the index so this field is useless. But I didn't delete it because I am lazy... 
+
+In this task, I met a few mistakes. First, I think I can still steal from other bucket if this bucket is all used. But later I realize taht this will cost a lot to search for something which doesn't exists. Who knows which bucket it will be in?
+
+Then, I still allocacte NBUF num bufs per bucket, which is 30 indeed, which results that I failed in full test, saying that I allocate more buffer than NBUF. So I tried to keep HashSize is 13 but decrease the bucketsize into 2. This bucketsize is too small to load so many data. Finally, I changed the HashSize into 7 and increase the bucket size into 4 and passed the test.
