@@ -107,15 +107,14 @@ kfreemem(void){
     struct run *r;
     uint64 ans = 0;
 
-    push_off();
-    int id = cpuid();
-    acquire(&kmem.lock[id]);
-    r = kmem.freelist[id];
-    while(r){
-        ans += PGSIZE;
-        r = r->next;
+    for(int id = 0;id < NCPU;id++){
+        acquire(&kmem.lock[id]);
+        r = kmem.freelist[id];
+        while(r){
+            ans += PGSIZE;
+            r = r->next;
+        }
+        release(&kmem.lock[id]);
     }
-    release(&kmem.lock[id]);
-    pop_off();
     return ans;
 }
