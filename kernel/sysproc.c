@@ -79,7 +79,42 @@ int
 sys_pgaccess(void)
 {
   // lab pgtbl: your code here.
-  return 0;
+  uint64 addr;
+  int num,bufflen;
+  uint64 destaddr;
+  pte_t *pte;
+  int total = 0;
+
+  pagetable_t pagetable = myproc()->pagetable;
+
+  argaddr(0,&addr);
+  argint(1,&num);
+  argaddr(2,&destaddr);
+
+  bufflen = num/8 + (num % 8 != 0);
+  char tmp[bufflen];
+  for(int i=0;i<bufflen;i++)tmp[i] = 0;
+  for(int i=0;i<bufflen;i++){
+    for(int j=0;j<8;j++){
+    	pte = walk(pagetable,addr + (i * 8 + j) * PGSIZE,0);
+        if((*pte) & PTE_A){
+    	    tmp[i] |= (1 <<j);
+	    total ++;
+        }
+	else{	
+    	    tmp[i] &= ~(1 <<j);
+	}
+	(*pte) &= ~PTE_A;
+    }
+  }
+  //for(int i=0;i<bufflen;i++){
+  //  printf("%p\n",tmp[i]);
+  //}
+  if(copyout(pagetable,destaddr,tmp,sizeof(tmp)) < 0){// copyput的时候。从低位开始
+    return -1;
+  }
+
+  return total;
 }
 #endif
 
