@@ -1,0 +1,19 @@
+# some log
+
+This lab takes me some days to finish because of the May day holiday. I start doing this at the begining of the holiday and finished task1, task2 when I was in Nanjin and task3 after the holiday, so my memory maybe confusing.
+
+# task1 getpid
+
+In this task, I add a page in the structure of the process just storage a pid. Then every time when I need this pid, I didn't get it from proc, but from the page, which is mapped to user space. I think this task is easy beacuse the document tells me all I need to do. I didn't remember what error I met. I just do like it says and passed the test.
+
+# task2 vmprint
+
+This task is also easy, just copy the function body of walk and print them. I met a mistake that I output an extra space at the end of the line and failed the test all the time. This is used to be a good habit when I debug mu code, but blocked me for a long time.
+
+# task3 pgaccess
+
+I did this task for the longest time, except the time I used to find the extra space. I don't know how to deal with the case that the number of the pages to test is bigger than the buffer or the allocated space. But I can't find an easy way to improve my robutness and just let it go. Then I use copyout, but I forget that this function copy the first source bit into the lowest bit of the destination buffer. Luckily, this is easy to find by outputing the buffers. Hardest part is to understand and use walk function. I knew nothing about it except the annotation in the code.
+
+# all in all
+
+I spent much time on this lab and learnt more about pages.
