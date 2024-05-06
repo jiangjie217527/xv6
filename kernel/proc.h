@@ -113,6 +113,7 @@ struct proc {
   uint64 handler_function;
 
   struct trapframe *alarmframe;
+  struct usyscall *usyscallpage;
 
   int trap_in;
     //end argument of trap-alarm

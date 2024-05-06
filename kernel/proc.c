@@ -132,6 +132,13 @@ found:
     return 0;
   }
 
+  if((p->usyscallpage = (struct usyscall *)kalloc()) == 0){
+    freeproc(p);
+    release(&p->lock);
+    return 0;
+  }
+
+  p->usyscallpage->pid = p->pid;
   // An empty user page table.
   p->pagetable = proc_pagetable(p);
   if(p->pagetable == 0){
@@ -171,6 +178,8 @@ freeproc(struct proc *p)
   if(p->trapframe)
     kfree((void*)p->trapframe);
   if(p->alarmframe)
+    kfree((void*)p->usyscallpage);
+  if(p->alarmframe)
     kfree((void*)p->alarmframe);
   p->trapframe = 0;
   if(p->pagetable)
@@ -198,6 +207,12 @@ proc_pagetable(struct proc *p)
   if(pagetable == 0)
     return 0;
 
+  // map the pidd page
+  if(mappages(pagetable, USYSCALL, PGSIZE,
+              (uint64)p->usyscallpage, PTE_U | PTE_R) < 0){
+    uvmfree(pagetable, 0);
+    return 0;
+  }
   // map the trampoline code (for system call return)
   // at the highest user virtual address.
   // only the supervisor uses it, on the way
@@ -227,6 +242,7 @@ proc_freepagetable(pagetable_t pagetable, uint64 sz)
 {
   uvmunmap(pagetable, TRAMPOLINE, 1, 0);
   uvmunmap(pagetable, TRAPFRAME, 1, 0);
+  uvmunmap(pagetable, USYSCALL, 1, 0);
   uvmfree(pagetable, sz);
 }
 
