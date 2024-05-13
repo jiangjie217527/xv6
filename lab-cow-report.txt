@@ -1,0 +1,23 @@
+# before the report
+
+I must claim that the document contained a big error. It guided me to modify conf/lab.mk as LAB=lock! At first I think maybe something in lock will be used in this lab so I do it as it was said. However, this makes 'cowtest' never compiled. Later I recognize this problem from Makefile.
+
+# error I met
+
+This lab is the hardest lab I'v ever met. The video was short but there are much information. What's more, this lab change a function many times, each time repairing some other previous problems, which makes me confused.
+
+First, modify uvmcopy(). Initially, I modified this, but only remove allocating new pages and use mappages to make the child and parent share the same page.
+
+Then, modify usertrap(). I think I am silly because the video tells me to find the number representing "write page fault", but the entry in the table only contains "store page fault". I spent a little time understanding and find this. Also, to find the register r_stval() also takes some time.
+
+After I recognize the fault, I also need to identify which page is read-only, which page is COW page and  which page is normally writable. So I have to add an entry in kernel/risc.h, correct the uvmcopy(). In fact, I should recognize this earler, and maintain this all the time. This bit blocks me in the future.
+
+Next, I need to modify kalloc and kfree to maintain the reference times of each page. Also, I need to add a lock to protect the cowCount. In this part, I met the first big error: I acquire the lock and return, but don't release the lock, so the process panic:acquire.
+
+Finally, the problem of copyout. This function is almost the same with codes in usertrap. But I updated something in usertraps and forgot to synchronize them into copytout, so I get blocked for some time.
+
+Error never stop. I also forget to handel some cases in usertraps. Then I handeled them and forget to end if. So the process will set the status of the process into kill and go on process.
+
+# techniques I have
+
+COW's idea is easy, but implementation requires a lot. I think make clear all the requirements before writing and keep a clear mind is crutial in this lab. Writing this report make me understand well.
