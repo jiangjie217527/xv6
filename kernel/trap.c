@@ -74,28 +74,33 @@ usertrap(void)
   //  printf("store page fault\n");
 	uint64 va = r_stval();
 	if(va >= MAXVA){
-		printf("usertrap(): store page fault: store va exceed MAXVA");
+		printf("usertrap(): store page fault: store va exceed MAXVA\n");
 		setkilled(p);
+        goto haskill;
 	}
 	pte_t *pte = walk(p->pagetable,va,0);
 	if(pte == 0){
-		printf("usertrap(): store page fault: pte not exist");
+		printf("usertrap(): store page fault: pte not exist\n");
 		setkilled(p);
+        goto haskill;
 	}
 	if(((*pte) & (PTE_V | PTE_U)) != (PTE_V | PTE_U)){
-		printf("usertrap(): store page fault: permission denied");
+		printf("usertrap(): store page fault: permission denied\n");
 		setkilled(p);
+        goto haskill;
 	}
 	if(((*pte) & (PTE_OW)) == 0){
-		printf("usertrap(): store page fault: read only");
+		printf("usertrap(): store page fault: read only\n");
 		setkilled(p);
+        goto haskill;
 	}
 	
 	//alloc new physical memory
 	uint64 new;
 	if((new =(uint64)kalloc()) == 0){
-		printf("usertrap(): store page fault: no free memory");
+		printf("usertrap(): store page fault: no free memory\n");
 		setkilled(p);
+        goto haskill;
 	}
 	
 	uint64 old = PTE2PA(*pte);
@@ -104,7 +109,6 @@ usertrap(void)
 	kfree((void *)old);
 	*pte = PA2PTE(new) | PTE_FLAGS(*pte) | PTE_W;
     *pte &= ~PTE_OW;
-//    printf("end store page fault\n");
   }
   else if((which_dev = devintr()) != 0){
     // ok
@@ -114,6 +118,7 @@ usertrap(void)
     setkilled(p);
   }
 
+haskill:
   if(killed(p))
     exit(-1);
 
