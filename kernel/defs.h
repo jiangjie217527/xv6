@@ -72,6 +72,7 @@ void*           kalloc(void);
 void            kfree(void *);
 void            kinit(void);
 uint64          kfreemem(void);
+void            add_count(uint64);
 
 // log.c
 void            initlog(int, struct superblock*);

@@ -15,6 +15,8 @@ extern char etext[];  // kernel.ld sets this to end of kernel code.
 
 extern char trampoline[]; // trampoline.S
 
+extern int cowCount[]; // kalloc.c
+
 // Make a direct-map page table for the kernel.
 pagetable_t
 kvmmake(void)
@@ -303,19 +305,25 @@ uvmfree(pagetable_t pagetable, uint64 sz)
   freewalk(pagetable);
 }
 
+// origin annotation
+//
 // Given a parent process's page table, copy
 // its memory into a child's page table.
 // Copies both the page table and the
 // physical memory.
 // returns 0 on success, -1 on failure.
 // frees any allocated pages on failure.
+//
+// new annotation
+//
+// make the child share the parent's
+// physical address, set read-only
 int
 uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
 {
   pte_t *pte;
   uint64 pa, i;
   uint flags;
-  char *mem;
 
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
@@ -323,14 +331,18 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
     if((*pte & PTE_V) == 0)
       panic("uvmcopy: page not present");
     pa = PTE2PA(*pte);
+	// remark this page originally writable
+	if(*pte & PTE_W){
+		*pte &= ~PTE_W;
+		*pte |= PTE_OW;
+	}
     flags = PTE_FLAGS(*pte);
-    if((mem = kalloc()) == 0)
-      goto err;
-    memmove(mem, (char*)pa, PGSIZE);
-    if(mappages(new, i, PGSIZE, (uint64)mem, flags) != 0){
-      kfree(mem);
+
+    if(mappages(new, i, PGSIZE, (uint64)pa, flags) != 0){
+      kfree((void *)pa);
       goto err;
     }
+    add_count(pa);
   }
   return 0;
 
@@ -366,13 +378,28 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
     if(va0 >= MAXVA)
       return -1;
     pte = walk(pagetable, va0, 0);
-    if(pte == 0 || (*pte & PTE_V) == 0 || (*pte & PTE_U) == 0 ||
-       (*pte & PTE_W) == 0)
+    if(pte == 0 || (*pte & PTE_V) == 0 || (*pte & PTE_U) == 0
+            || ((*pte & (PTE_W | PTE_OW)) == 0))
       return -1;
     pa0 = PTE2PA(*pte);
     n = PGSIZE - (dstva - va0);
     if(n > len)
       n = len;
+	if((*pte) & (PTE_OW)){
+		//alloc new physical memory
+		uint64 new;
+		if((new = (uint64)kalloc()) == 0){
+			return -1;
+		}
+		
+		memmove((void *)new,(void *)pa0,PGSIZE);
+	
+		kfree((void *)pa0);
+		*pte = PA2PTE(new) | PTE_FLAGS(*pte) | PTE_W;
+        *pte &= ~PTE_OW;
+        pa0 = PTE2PA(*pte);
+	}
+
     memmove((void *)(pa0 + (dstva - va0)), src, n);
 
     len -= n;

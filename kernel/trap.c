@@ -15,6 +15,7 @@ extern char trampoline[], uservec[], userret[];
 void kernelvec();
 
 extern int devintr();
+extern int cowCount[]; // kallc.c
 
 void
 trapinit(void)
@@ -67,7 +68,45 @@ usertrap(void)
     intr_on();
 
     syscall();
-  } else if((which_dev = devintr()) != 0){
+  }else if(r_scause() == 15){
+	// store page fault
+	//check read_only
+  //  printf("store page fault\n");
+	uint64 va = r_stval();
+	if(va >= MAXVA){
+		printf("usertrap(): store page fault: store va exceed MAXVA");
+		setkilled(p);
+	}
+	pte_t *pte = walk(p->pagetable,va,0);
+	if(pte == 0){
+		printf("usertrap(): store page fault: pte not exist");
+		setkilled(p);
+	}
+	if(((*pte) & (PTE_V | PTE_U)) != (PTE_V | PTE_U)){
+		printf("usertrap(): store page fault: permission denied");
+		setkilled(p);
+	}
+	if(((*pte) & (PTE_OW)) == 0){
+		printf("usertrap(): store page fault: read only");
+		setkilled(p);
+	}
+	
+	//alloc new physical memory
+	uint64 new;
+	if((new =(uint64)kalloc()) == 0){
+		printf("usertrap(): store page fault: no free memory");
+		setkilled(p);
+	}
+	
+	uint64 old = PTE2PA(*pte);
+	memmove((void *)new,(void *)old,PGSIZE);
+
+	kfree((void *)old);
+	*pte = PA2PTE(new) | PTE_FLAGS(*pte) | PTE_W;
+    *pte &= ~PTE_OW;
+//    printf("end store page fault\n");
+  }
+  else if((which_dev = devintr()) != 0){
     // ok
   } else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);

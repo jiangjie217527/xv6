@@ -23,16 +23,18 @@ struct {
   struct run *freelist[NCPU];
 } kmem;
 
+int cowCount[PHYSTOP / PGSIZE];
+struct spinlock cowlock;
 void
 kinit()
 {
-
     char name[8] = {'k','m','e','m','_','!','\0'};
     for(int i=0;i<NCPU;i++){
       name[5] = i+'0';
       initlock(&kmem.lock[i], name);
     }
     freerange(end, (void*)PHYSTOP);
+    initlock(&cowlock,"cowlock");
 }
 
 void
@@ -40,8 +42,10 @@ freerange(void *pa_start, void *pa_end)
 {
   char *p;
   p = (char*)PGROUNDUP((uint64)pa_start);
-  for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE)
+  for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE){
+	cowCount[(uint64)p/PGSIZE] = 1;
     kfree(p);
+  }
 }
 
 // Free the page of physical memory pointed at by pa,
@@ -51,6 +55,13 @@ freerange(void *pa_start, void *pa_end)
 void
 kfree(void *pa)
 {
+  int id,remain;
+  acquire(&cowlock);
+    remain = --cowCount[(uint64)pa/PGSIZE];
+  release(&cowlock);
+
+  if(remain)return;
+
   struct run *r;
 
   if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
@@ -62,12 +73,12 @@ kfree(void *pa)
   r = (struct run*)pa;
 
   push_off();
-  int id = cpuid();
+  id = cpuid();
   acquire(&kmem.lock[id]);
   r->next = kmem.freelist[id];
   kmem.freelist[id] = r;
   release(&kmem.lock[id]);
-  pop_off();
+  pop_off();  
 }
 
 // Allocate one 4096-byte page of physical memory.
@@ -97,8 +108,11 @@ kalloc(void)
       }
   }
   pop_off();
-  if(r)
+  if(r){
+	cowCount[(uint64)r/PGSIZE] = 1;
     memset((char*)r, 5, PGSIZE); // fill with junk
+  }
+
   return (void*)r;
 }
 
@@ -117,4 +131,11 @@ kfreemem(void){
         release(&kmem.lock[id]);
     }
     return ans;
+}
+
+void
+add_count(uint64 pa){
+    acquire(&cowlock);
+    cowCount[pa/PGSIZE]++;
+    release(&cowlock);
 }
