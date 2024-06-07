@@ -23,8 +23,8 @@
 #include "fs.h"
 #include "buf.h"
 
-#define HASHSIZE 7
-#define BUCKETSIZE 4
+#define HASHSIZE 3
+#define BUCKETSIZE 10
 const int Hash = HASHSIZE;
 struct {
   struct spinlock lock;
@@ -43,7 +43,19 @@ binit(void)
     }
   }
 }
-
+/*
+int
+btot(void){
+    int tot = 0;
+  struct buf *b;
+    for(int i=0;i<HASHSIZE;i++)
+        for(int j=0;j<BUCKETSIZE;j++){
+            b = &(bcache[i].buf[j]);
+            if(b->refcnt) tot++;
+        }
+    return tot;
+}
+*/
 // Look through buffer cache for block on device dev.
 // If not found, allocate a buffer.
 // In either case, return locked buffer.
@@ -63,7 +75,16 @@ bget(uint dev, uint blockno)
           break; 
       }
   }
-  if(find == 0)
+  if(find == 0){
+#ifdef LAB_FS_UNUSE
+    printf("get the first cache");
+    b = &(bcache[id].buf[0]);    
+    b->dev = dev;
+    b->blockno = blockno;
+    b->valid = 0;
+    b->refcnt = 1;
+    find = 1;
+#else
   for(int i=0;i<BUCKETSIZE;i++){
     b = &(bcache[id].buf[i]);
     if(b->refcnt == 0){
@@ -73,9 +94,10 @@ bget(uint dev, uint blockno)
         b->refcnt = 1;
         find = 1;
         break;
+      }
     }
-  }
-
+#endif
+}
   release(&bcache[id].lock);
   if(find == 0)
     panic("bget: no unused buffer for recycle"); 
