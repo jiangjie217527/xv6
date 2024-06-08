@@ -29,6 +29,7 @@ int sleep(int);
 int uptime(void);
 int trace(int); // new trace
 int sysinfo(struct sysinfo *); // new sysinfotest
+int symlink(char *,char *);
 //trap --- alarm  --begin
 int sigalarm(int ticks, void (*handler)());
 int sigreturn(void);

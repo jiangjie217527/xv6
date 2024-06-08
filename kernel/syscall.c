@@ -115,6 +115,10 @@ extern uint64 sys_connect(void);
 extern uint64 sys_pgaccess(void);
 #endif
 
+#ifdef LAB_FS
+extern uint64 sys_symlink(void);
+#endif
+
 // An array mapping syscall numbers from syscall.h
 // to the function that handles the system call.
 static uint64 (*syscalls[])(void) = {
@@ -150,6 +154,9 @@ static uint64 (*syscalls[])(void) = {
 // Trap syscall call
 [SYS_sigalarm] sys_sigalarm,
 [SYS_sigreturn] sys_sigreturn,
+#ifdef LAB_FS
+[SYS_symlink] sys_symlink,
+#endif
 };
 
 static char *syscall_name[] = {

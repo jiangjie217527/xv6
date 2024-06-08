@@ -198,6 +198,7 @@ sys_unlink(void)
 
   begin_op();
   if((dp = nameiparent(path, name)) == 0){
+
     end_op();
     return -1;
   }
@@ -231,7 +232,6 @@ sys_unlink(void)
   ip->nlink--;
   iupdate(ip);
   iunlockput(ip);
-
   end_op();
 
   return 0;
@@ -311,22 +311,23 @@ sys_open(void)
   int n;
 
   argint(1, &omode);
+
   if((n = argstr(0, path, MAXPATH)) < 0)
     return -1;
 
   begin_op();
-
   if(omode & O_CREATE){
     ip = create(path, T_FILE, 0, 0);
     if(ip == 0){
       end_op();
       return -1;
     }
-  } else {
+  } else{
     if((ip = namei(path)) == 0){
       end_op();
       return -1;
     }
+
     ilock(ip);
     if(ip->type == T_DIR && omode != O_RDONLY){
       iunlockput(ip);
@@ -335,11 +336,67 @@ sys_open(void)
     }
   }
 
+  if(ip->type == T_SYMLINK && !(omode & O_NOFOLLOW)){
+    int np = 0;
+    char sympath[MAXPATH];
+    memset(sympath,0,MAXPATH);
+    int depth = 0;
+    int max_depth = 10;
+    //int i;
+    //char sympath[100][MAXPATH];
+    //dst = np
+    /*
+    while(depth < 100){
+        readi(ip,0,np,0,4);
+        readi(ip,0,sympath[depth],4,*np);
+
+        if(strcmp(path,sympath[depth]) == 0){
+            printf("open(): get in a circle\n");
+            return -1;
+        }
+        for(i=0;i<depth;++i){
+            //circle
+            if(strcmp(sympath[i],sympath[depth]) == 0){
+                printf("open(): get in a circle\n");
+                return -1;
+            }
+        }
+
+        ip = namei(sympath[depth]);
+        if(ip->type != T_SYMLINK){
+            break;
+        }
+    }
+    */
+    while(depth < max_depth){
+        readi(ip,0,(uint64)&np,0,4);
+        readi(ip,0,(uint64)sympath,4,np);
+
+        iunlockput(ip);      
+        if((ip = namei(sympath)) == 0){
+            end_op();
+            return -1;
+        }
+        ilock(ip);
+        if(ip->type != T_SYMLINK){
+            break;
+        }
+        depth ++;
+    }
+    if(depth == max_depth){
+        iunlockput(ip);
+        end_op();
+        printf("open(): symlink too many depth\n");
+        return -1;
+    }
+  }
+
   if(ip->type == T_DEVICE && (ip->major < 0 || ip->major >= NDEV)){
     iunlockput(ip);
     end_op();
     return -1;
   }
+
 
   if((f = filealloc()) == 0 || (fd = fdalloc(f)) < 0){
     if(f)
@@ -352,7 +409,7 @@ sys_open(void)
   if(ip->type == T_DEVICE){
     f->type = FD_DEVICE;
     f->major = ip->major;
-  } else {
+  }else {
     f->type = FD_INODE;
     f->off = 0;
   }
@@ -502,4 +559,50 @@ sys_pipe(void)
     return -1;
   }
   return 0;
+}
+
+uint64
+sys_symlink(void)
+{
+    char target[MAXPATH], path[MAXPATH];
+    memset(target,0,MAXPATH);
+    memset(path,0,MAXPATH);
+    int nt = 0,np = 0;
+    struct inode *ip;
+    //uint addr, *a;
+    //struct buf *bp;
+
+    if((nt = argstr(0, target, MAXPATH)) < 0)
+        return -1;
+    if((np = argstr(1, path, MAXPATH)) < 0)
+        return -1;
+
+    begin_op();
+    if((ip = namei(path)) !=0){
+        end_op();
+        return -1;
+    }
+
+    ip = create(path,T_SYMLINK,0,0);
+    if(ip == 0){
+      end_op();
+      return -1;
+    }
+    /*
+    addr = balloc(ip->dev);
+    if(addr == 0){
+        end_op();
+        return 0;
+    }
+    ip->addrs[0] = addr;
+    bp = bread(ip->dev,addr);
+    a = (uint*)bp->data;
+    */
+    //user_src = 0 mneas kernel address
+    //offset = 0
+    writei(ip,0,(uint64)&nt,0,4);
+    writei(ip,0,(uint64)target,4,nt);
+    iunlockput(ip);
+    end_op();    
+    return 0;
 }
