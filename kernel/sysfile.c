@@ -606,3 +606,98 @@ sys_symlink(void)
     end_op();    
     return 0;
 }
+
+uint64
+sys_mmap(void){
+    struct proc* p = myproc();
+    uint64 addr;
+    int length;
+    int prot,flags,fd;
+    int offset;
+    struct file* f;
+    argaddr(0,&addr);
+    argint(1,&length);
+    argint(2,&prot);
+    argint(3,&flags);
+/*
+    if(
+            argaddr(0,&addr) < 0
+            || argint(1,&length) < 0
+            || argint(2,&prot) < 0
+            || argint(3,&flags) < 0
+            || argfd(4,&fd,&f) < 0
+            || argint(5,&offset) < 0
+                )
+*/
+    if(argfd(4,&fd,&f) < 0)
+        return -1;
+    argint(5,&offset);
+    
+    length = PGROUNDUP(length);
+    //test valid argument
+    if(MAXVA - length < p->sz
+            || (!f->readable && (prot & PROT_READ))
+            || (!f->writable && (prot & PROT_WRITE) && (flags == MAP_SHARED)))
+        return -1;
+    for(int i = 0;i < VMA_NUM;i++){
+        struct vma* vma = &p->vmas[i];
+        if(!vma->valid){
+            vma->valid = 1;
+            vma->addr = p->sz;
+            p->sz += length;
+            vma->length = length;
+            vma->prot = prot;
+            vma->flags = flags;
+            vma->fd = fd;
+            vma->f = f;
+            filedup(f);  // Increment ref count for file f.
+            vma->offset = offset;
+            return vma->addr;
+        }
+    }
+
+    return -1;
+}
+
+uint64
+sys_munmap(void){
+    uint64 addr;
+    int length;
+    argaddr(0,&addr);
+    argint(1,&length);
+    struct proc *p = myproc();
+    struct vma* vma = 0;
+    for(int i=0;i<VMA_NUM;i++){
+        if(p->vmas[i].valid && addr >= p->vmas[i].addr && addr <= p->vmas[i].addr + p->vmas[i].length){
+            vma = &p->vmas[i];
+            break;
+        }
+    }
+    if(vma == 0)
+        return -1;
+    addr = PGROUNDDOWN(addr);
+    length = PGROUNDUP(length);
+    if(vma->flags & MAP_SHARED){
+        if(filewrite(vma->f,addr,length) < 0){
+            printf("munmap(): file write back error,maybe not allocated\n");
+        }
+    }
+    uvmunmap(p->pagetable,addr,length/PGSIZE,1);
+
+    if(addr == vma->addr && length == vma->length){
+        //full release
+        fileclose(vma->f);
+        vma->valid = 0;
+    }else if(addr == vma->addr){
+        //release head part
+        vma->addr += length;
+        vma->length -= length;
+        vma->offset += length;
+    }else if((addr + length) == (vma->addr + vma->length)){
+        //release tail
+        vma->length -= length;
+    }else{
+        panic("munmap(): unmap area not in the capacity of this operating system");
+    }
+    return 0;
+}

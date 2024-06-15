@@ -27,9 +27,12 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
+
 int trace(int); // new trace
 int sysinfo(struct sysinfo *); // new sysinfotest
 int symlink(char *,char *);
+void *mmap(void *,size_t,int,int,int,off_t);
+int munmap(void *,size_t);
 //trap --- alarm  --begin
 int sigalarm(int ticks, void (*handler)());
 int sigreturn(void);

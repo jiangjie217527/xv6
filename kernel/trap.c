@@ -1,10 +1,14 @@
 #include "types.h"
+#include "fcntl.h"
 #include "param.h"
 #include "memlayout.h"
 #include "riscv.h"
 #include "spinlock.h"
+#include "sleeplock.h"
 #include "proc.h"
 #include "defs.h"
+#include "fs.h"
+#include "file.h"
 
 struct spinlock tickslock;
 uint ticks;
@@ -68,16 +72,58 @@ usertrap(void)
     intr_on();
 
     syscall();
-  }else if(r_scause() == 15){
-	// store page fault
-	//check read_only
-  //  printf("store page fault\n");
+  }else if(r_scause() == 13 || r_scause() == 15){
+    //consider read page fault and check if it is because mmap or simply cow
+    //important:
+    //difference between mmap and cow
+    //mmap should allocate new physical page and store content from file
+    //while cow allocate new physical page and store the same content from the
+    //origin memory space
+
 	uint64 va = r_stval();
 	if(va >= MAXVA){
-		printf("usertrap(): store page fault: store va exceed MAXVA\n");
+		printf("usertrap(): read or store page fault: va exceed MAXVA\n");
 		setkilled(p);
         goto haskill;
 	}
+    if(va > p->sz){
+		printf("usertrap(): read or store page fault: va exceed process size\n");
+		setkilled(p);
+        goto haskill;
+	}
+
+    int mmap_lazy = 0;
+    uint64 mmap_va = PGROUNDDOWN(va);
+    for(int i=0;i<VMA_NUM;i++){
+        struct vma* vma = &p->vmas[i];
+        if(vma->valid && va >= vma->addr && va < vma->addr + vma->length){
+            mmap_lazy = 1;
+            uint64 new;
+	        if((new =(uint64)kalloc()) == 0){
+		        printf("usertrap(): read or store page fault: no free memory(in mmap operation)\n");
+		        setkilled(p);
+                goto haskill;
+	        }
+            memset((void *)new,0,PGSIZE);
+            ilock(vma->f->ip);
+            if(readi(vma->f->ip,0,new,vma->offset + mmap_va - vma->addr,PGSIZE) < 0){
+                iunlock(vma->f->ip);
+                printf("usertrap(): unknown error, read file failure");
+		        setkilled(p);
+                goto haskill;
+            }
+            iunlock(vma->f->ip);
+            int perm =  PTE_U | (vma->prot & PROT_READ ? PTE_R:0) | (vma->prot & PROT_WRITE ? PTE_W : 0) | (vma->prot & PROT_EXEC ? PTE_X : 0); // PTE_V is added int mappages
+            if(mappages(p->pagetable,mmap_va,PGSIZE,new,perm) < 0){
+                printf("usertrap(): unknown error, map pages failure");
+		        setkilled(p);
+                goto haskill;
+            }
+            break;
+        }
+    }
+if(!mmap_lazy){
+    //condition that this is not mmap
 	pte_t *pte = walk(p->pagetable,va,0);
 	if(pte == 0){
 		printf("usertrap(): store page fault: pte not exist\n");
@@ -109,6 +155,7 @@ usertrap(void)
 	kfree((void *)old);
 	*pte = PA2PTE(new) | PTE_FLAGS(*pte) | PTE_W;
     *pte &= ~PTE_OW;
+}
   }
   else if((which_dev = devintr()) != 0){
     // ok

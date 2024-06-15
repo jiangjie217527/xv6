@@ -1,0 +1,27 @@
+This lab is hard to handle, there are several problems I met.
+
+# vma structure
+
+I noticed that some value types of mmap are size_t or off_t, so I follow the same type in structure vma. However, this can not compile, because in the kernel mode, xv6 doesn't know what is size_t. So I can only change it back to int. It is the same cases in mmap.
+
+I used to add a filed called "mapped" to mark whether this vma was mapped, however, later I find that the vma maybe half mapped, So I can not trace what was mapped in this way. Later I want to trace every PAGE of the mapped file, but it may takes too much space. FInally, I think the only use to trace which page is mapped is that when I write munmap, I know which page I should uvmunmap. xv6 will panic if it uvmunmap a not mapped pages. However, if I just annotate the panic and change it into continue, so this problem won't happen, and I don't need to trace which page was mapped. It is the same with uvmcopy.
+
+# mmap function
+
+In this function, just check something of the map require and find an empty vma slot and fill in the vma. Easy in fact.
+
+# usertrap
+
+In this part, I need to handle this trap and cow, which use the same r_scause of 15. So it is important to figure out what are the difference between them. In fact, if the va is in the range of some vma, then this is mmap page fault. Otherwise, this maybe cow. So we should first check, which need to traversal the vma array of the process. If the va is indeed in some vma, then allocate the physical address, otherwise, leave it to the code of cow.
+
+# munmap function
+
+In this function, just find the specific vma, write back if necessary and change the addr and length.
+
+# exit and fork
+
+unmap all valid vma when exit, and copy all valid vma when fork.
+
+# usertests -q
+
+In this test, writebig spend too many times, so I reduce the MAX_FILE.
